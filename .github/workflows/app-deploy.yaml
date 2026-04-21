@@ -10,8 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      AWS_REGION: us-east-1
+
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -21,6 +20,7 @@ jobs:
         with:
           node-version: 20
 
+      # ✅ FRONTEND BUILD
       - name: Install frontend dependencies
         working-directory: frontend
         run: npm install
@@ -29,33 +29,56 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+      # ✅ BACKEND SETUP
       - name: Install backend dependencies
         working-directory: backend
         run: npm install
 
-      # Add deployment steps here, e.g., SCP to EC2, S3 upload, or SSH commands
-      # Example: Copy build to EC2 (requires SSH key in secrets and EC2 public IP)
+      # ✅ SSH KEY
       - name: Add SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "$EC2_KEY" > ~/.ssh/id_rsa
+          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
-        env:
-          EC2_KEY: ${{ secrets.EC2_KEY }}
 
-      - name: Deploy to EC2 (example)
+      # ✅ COPY FILES TO EC2
+      - name: Upload files to EC2
         run: |
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r frontend/dist/* $EC2_USER@$EC2_HOST:/var/www/frontend/
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r backend/* $EC2_USER@$EC2_HOST:/var/www/backend/
-        env:
-          EC2_HOST: ${{ secrets.EC2_HOST }}
-          EC2_USER: ${{ secrets.EC2_USER }}
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r frontend/dist/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/frontend/
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r backend/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/backend/
 
-      - name: Create backend .env file
+      # ✅ RUN COMMANDS ON EC2 (Nginx + Backend)
+      - name: Setup & Restart Services on EC2
         run: |
-          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > backend/.env
-          echo "PORT=${{ secrets.BACKEND_PORT }}" >> backend/.env
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
 
-      - name: Create frontend .env file
-        run: |
-          echo "VITE_API_URL=${{ secrets.VITE_API_URL }}" > frontend/.env
+          # Install Nginx if not installed
+          sudo yum install -y nginx || sudo apt install -y nginx
+
+          # Start Nginx
+          sudo systemctl enable nginx
+          sudo systemctl restart nginx
+
+          # Clean old frontend
+          sudo rm -rf /usr/share/nginx/html/*
+
+          # Move new build to Nginx root
+          sudo cp -r /var/www/frontend/* /usr/share/nginx/html/
+
+          # Backend setup
+          cd /var/www/backend
+          npm install
+
+          # Create .env
+          echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > .env
+          echo "PORT=${{ secrets.BACKEND_PORT }}" >> .env
+
+          # Install PM2 if not installed
+          sudo npm install -g pm2
+
+          # Restart backend
+          pm2 delete backend || true
+          pm2 start index.js --name backend
+          pm2 save
+
+          EOF
