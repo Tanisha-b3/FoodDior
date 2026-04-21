@@ -124,11 +124,15 @@ resource "aws_security_group" "ec2_sg" {
 # -----------------------
 # Key Pair
 # -----------------------
-resource "aws_key_pair" "deployer" {
-  key_name   = "waste-food-key"
-  public_key = file("~/.ssh/id_rsa.pub")
+variable "public_key" {
+  description = "SSH Public Key"
+  type        = string
 }
 
+resource "aws_key_pair" "deployer" {
+  key_name   = "waste-food-key"
+  public_key = var.public_key
+}
 # -----------------------
 # EC2 Instance
 # -----------------------
