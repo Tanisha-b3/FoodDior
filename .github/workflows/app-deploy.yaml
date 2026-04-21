@@ -40,54 +40,50 @@ jobs:
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
-          chmod 400 ~/.ssh/id_rsa
+          chmod 600 ~/.ssh/id_rsa
 
+      # ✅ CREATE DIRECTORIES (FIXED INDENTATION)
       - name: Create directories on EC2
-      run: |
-            ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-    
-           sudo mkdir -p /var/www/frontend
-    sudo mkdir -p /var/www/backend
+        run: |
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
 
-    # give permission
-    sudo chown -R ec2-user:ec2-user /var/www
+          sudo mkdir -p /var/www/frontend
+          sudo mkdir -p /var/www/backend
 
-    EOF
+          sudo chown -R ec2-user:ec2-user /var/www
 
-      # ✅ COPY FILES TO EC2
+          EOF
+
+      # ✅ UPLOAD FILES
       - name: Upload files to EC2
         run: |
           scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r frontend/dist/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/frontend/
           scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r backend/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/backend/
 
-      # ✅ RUN COMMANDS ON EC2 (Nginx + Backend)
+      # ✅ SETUP SERVICES
       - name: Setup & Restart Services on EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
 
-          # Install Nginx if not installed
+          # Install Nginx
           sudo yum install -y nginx || sudo apt install -y nginx
 
           # Start Nginx
           sudo systemctl enable nginx
           sudo systemctl restart nginx
 
-          # Clean old frontend
+          # Deploy frontend
           sudo rm -rf /usr/share/nginx/html/*
-
-          # Move new build to Nginx root
           sudo cp -r /var/www/frontend/* /usr/share/nginx/html/
-
 
           # Backend setup
           cd /var/www/backend
           npm install
 
-          # Create .env
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > .env
           echo "PORT=${{ secrets.BACKEND_PORT }}" >> .env
 
-          # Install PM2 if not installed
+          # Install PM2
           sudo npm install -g pm2
 
           # Restart backend
