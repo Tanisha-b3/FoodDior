@@ -42,6 +42,18 @@ jobs:
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 400 ~/.ssh/id_rsa
 
+      - name: Create directories on EC2
+      run: |
+            ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
+    
+           sudo mkdir -p /var/www/frontend
+    sudo mkdir -p /var/www/backend
+
+    # give permission
+    sudo chown -R ec2-user:ec2-user /var/www
+
+    EOF
+
       # ✅ COPY FILES TO EC2
       - name: Upload files to EC2
         run: |
