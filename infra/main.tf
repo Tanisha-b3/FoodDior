@@ -137,7 +137,7 @@ resource "aws_key_pair" "deployer" {
 # EC2 Instance
 # -----------------------
 resource "aws_instance" "app" {
-  ami           = "ami-0c02fb55956c7d316"
+  ami = "ami-053b0d53c279acc90" 
   instance_type = "t2.micro"
 
   subnet_id              = aws_subnet.public_a.id
