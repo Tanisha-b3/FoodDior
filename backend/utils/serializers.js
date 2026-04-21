@@ -1,0 +1,16 @@
+export const serializeUser = (user) => ({
+  _id: user._id,
+  id: user._id,
+  name: user.name,
+  email: user.email,
+  phone: user.phone,
+  role: user.role,
+  city: user.city,
+  state: user.state,
+  rating: user.rating,
+  totalDonations: user.totalDonations,
+  totalPickups: user.totalPickups,
+  isActive: user.isActive,
+  lastLogin: user.lastLogin,
+  createdAt: user.createdAt,
+});
