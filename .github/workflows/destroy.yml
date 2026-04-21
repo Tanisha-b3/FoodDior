@@ -10,6 +10,8 @@ jobs:
     defaults:
       run:
         working-directory: infra
+        environment: production
+
 
     steps:
       - name: Checkout code
