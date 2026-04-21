@@ -36,3 +36,5 @@ jobs:
 
       - name: Terraform Destroy
         run: terraform destroy -auto-approve
+        env:
+            TF_VAR_public_key: ${{ secrets.SSH_PUBLIC_KEY }}
