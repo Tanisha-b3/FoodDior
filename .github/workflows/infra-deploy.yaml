@@ -2,9 +2,6 @@ name: Apply AWS Infrastructure
 
 on:
   workflow_dispatch:   # manual only
-  push:
-    paths:
-      - 'infra/**'
 
 jobs:
   terraform:
