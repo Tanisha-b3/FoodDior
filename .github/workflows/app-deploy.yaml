@@ -13,82 +13,87 @@ jobs:
     environment: production
 
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
+      - uses: actions/setup-node@v4
         with:
           node-version: 20
 
-      # ✅ FRONTEND BUILD
-      - name: Install frontend dependencies
+      # FRONTEND BUILD
+      - run: npm install
         working-directory: frontend
-        run: npm install
 
-      - name: Build frontend
+      - run: npm run build
         working-directory: frontend
-        run: npm run build
 
-      # ✅ BACKEND SETUP
-      - name: Install backend dependencies
+      # BACKEND DEPENDENCIES
+      - run: npm install
         working-directory: backend
-        run: npm install
 
-      # ✅ SSH KEY
-      - name: Add SSH key
+      # SSH SETUP
+      - name: Setup SSH
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.SSH_KEY }}" > ~/.ssh/id_rsa
           chmod 600 ~/.ssh/id_rsa
 
-      # ✅ CREATE DIRECTORIES (FIXED INDENTATION)
-      - name: Create directories on EC2
+      # CREATE DIRECTORIES
+      - name: Prepare EC2
         run: |
-          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << 'EOF'
-
-          sudo mkdir -p /var/www/frontend
-          sudo mkdir -p /var/www/backend
-
+          ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
+          sudo mkdir -p /var/www/frontend /var/www/backend
           sudo chown -R ec2-user:ec2-user /var/www
-
           EOF
 
-      # ✅ UPLOAD FILES
-      - name: Upload files to EC2
+      # UPLOAD FILES
+      - name: Upload files
         run: |
           scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r frontend/dist/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/frontend/
           scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r backend/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/backend/
 
-      # ✅ SETUP SERVICES
-      - name: Setup & Restart Services on EC2
+      # DEPLOY + CONFIGURE SERVER
+      - name: Deploy App
         run: |
           ssh -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }} << EOF
 
-          # Install Nginx
-          sudo yum install -y nginx || sudo apt install -y nginx
-
-          # Start Nginx
-          sudo systemctl enable nginx
-          sudo systemctl restart nginx
-
-          # Deploy frontend
+          # FRONTEND → NGINX
           sudo rm -rf /usr/share/nginx/html/*
           sudo cp -r /var/www/frontend/* /usr/share/nginx/html/
 
-          # Backend setup
+          # BACKEND SETUP
           cd /var/www/backend
           npm install
 
           echo "MONGODB_URI=${{ secrets.MONGODB_URI }}" > .env
           echo "PORT=${{ secrets.BACKEND_PORT }}" >> .env
 
-          # Install PM2
-          sudo npm install -g pm2
-
-          # Restart backend
+          # PM2 START
           pm2 delete backend || true
           pm2 start index.js --name backend
           pm2 save
+
+          # NGINX CONFIG (API ROUTE)
+          sudo tee /etc/nginx/conf.d/app.conf > /dev/null <<EOL
+          server {
+              listen 80;
+
+              location / {
+                  root /usr/share/nginx/html;
+                  index index.html;
+                  try_files \$uri /index.html;
+              }
+
+              location /api/ {
+                  proxy_pass http://localhost:5000/;
+                  proxy_http_version 1.1;
+                  proxy_set_header Upgrade \$http_upgrade;
+                  proxy_set_header Connection 'upgrade';
+                  proxy_set_header Host \$host;
+                  proxy_cache_bypass \$http_upgrade;
+              }
+          }
+EOL
+
+          sudo systemctl restart nginx
 
           EOF
