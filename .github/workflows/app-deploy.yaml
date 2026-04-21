@@ -92,7 +92,7 @@ jobs:
                   proxy_cache_bypass \$http_upgrade;
               }
           }
-EOL
+          EOL
 
           sudo systemctl restart nginx
 
