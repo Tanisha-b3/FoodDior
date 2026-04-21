@@ -10,6 +10,7 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    environment: production
 
     steps:
       - name: Checkout code
@@ -38,14 +39,14 @@ jobs:
       - name: Add SSH key
         run: |
           mkdir -p ~/.ssh
-          echo "${{ secrets.EC2_KEY }}" > ~/.ssh/id_rsa
-          chmod 600 ~/.ssh/id_rsa
+          echo "${{ secrets.SSH_PUBLIC_KEY }}" > ~/.ssh/id_rsa.pub
+          chmod 600 ~/.ssh/id_rsa.pub
 
       # ✅ COPY FILES TO EC2
       - name: Upload files to EC2
         run: |
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r frontend/dist/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/frontend/
-          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa -r backend/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/backend/
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub -r frontend/dist/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/frontend/
+          scp -o StrictHostKeyChecking=no -i ~/.ssh/id_rsa.pub -r backend/* ${{ secrets.EC2_USER }}@${{ secrets.EC2_HOST }}:/var/www/backend/
 
       # ✅ RUN COMMANDS ON EC2 (Nginx + Backend)
       - name: Setup & Restart Services on EC2
@@ -64,6 +65,7 @@ jobs:
 
           # Move new build to Nginx root
           sudo cp -r /var/www/frontend/* /usr/share/nginx/html/
+
 
           # Backend setup
           cd /var/www/backend
