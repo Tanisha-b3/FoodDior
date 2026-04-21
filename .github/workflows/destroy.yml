@@ -6,11 +6,13 @@ on:
 jobs:
   destroy:
     runs-on: ubuntu-latest
+    environment: production
+
 
     defaults:
       run:
         working-directory: infra
-        environment: production
+      
 
 
     steps:
