@@ -1,10 +1,13 @@
-name: Destroy AWS Infrastructure
+name: Apply AWS Infrastructure
 
 on:
-  workflow_dispatch:   # ONLY manual trigger
+  workflow_dispatch:   # manual only
+  push:
+    paths:
+      - 'infra/**'
 
 jobs:
-  destroy:
+  terraform:
     runs-on: ubuntu-latest
 
     defaults:
@@ -30,5 +33,15 @@ jobs:
       - name: Terraform Init
         run: terraform init
 
-      - name: Terraform Destroy
-        run: terraform destroy -auto-approve
+      - name: Terraform Format Check
+        run: terraform fmt -check
+
+      - name: Terraform Validate
+        run: terraform validate
+
+      - name: Terraform Plan
+        run: terraform plan
+
+      - name: Terraform Apply (Manual Only)
+        if: github.event_name == 'workflow_dispatch'
+        run: terraform apply -auto-approve
